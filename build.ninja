@@ -1,0 +1,185 @@
+libuv_root = ../libuv-1.52.1
+mimalloc_root = ../mimalloc-3.4.5
+cc = clang
+cxx = clang++
+
+sqlite_ldlibs = -lsqlite3
+
+mimalloc_cflags = -DNOROI_MIMALLOC -I$mimalloc_root/include
+mimalloc_ldlibs = -L$mimalloc_root/build -lmimalloc $
+    -Wl,-rpath,@loader_path/../../$mimalloc_root/build
+
+cflags = -std=c23 -Wall -Wextra -I$libuv_root/include
+cxxflags = -std=c++23 -Wall -Wextra -I$libuv_root/include
+ldflags = $libuv_root/build/libuv.a -lpthread -lm $sqlite_ldlibs
+
+gtest_cflags = -I/opt/homebrew/include -DGTEST_HAS_PTHREAD=1
+gtest_ldlibs = -L/opt/homebrew/lib -lgtest_main -lgtest -pthread
+
+test_cxxflags = -std=c++23 -Wall -Wextra -I$libuv_root/include $gtest_cflags
+test_ldflags = $libuv_root/build/libuv.a -lpthread -lm $sqlite_ldlibs $
+    $gtest_ldlibs
+
+coverage_flags = -O0 -g -fprofile-instr-generate -fcoverage-mapping
+coverage_cflags = $cflags $coverage_flags
+coverage_test_cxxflags = $test_cxxflags $coverage_flags
+coverage_test_ldflags = $test_ldflags $coverage_flags
+
+builddir = build
+devdir = $builddir/dev
+distdir = $builddir/dist
+coveragedir = $builddir/coverage
+
+distflags = -O3 -DNDEBUG -flto -DLOG_LEVEL='(-1)'
+dist_cflags = $cflags $distflags
+dist_cxxflags = $cxxflags $distflags
+dist_ldflags = $ldflags $mimalloc_ldlibs -O3 -flto -Wl,-dead_strip
+
+rule mkdir
+  command = mkdir -p $out
+  description = MKDIR $out
+
+rule cxx
+  command = $cxx $cxxflags -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  deps = gcc
+  description = CXX $out
+
+rule cc
+  command = $cc $cflags -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  deps = gcc
+  description = CC $out
+
+rule link
+  command = $cxx $in -o $out $ldflags
+  description = CXXLINK $out
+
+rule cxx_test
+  command = $cxx $test_cxxflags $in -o $out $test_ldflags
+  description = CXXLINK $out
+
+rule cc_coverage
+  command = $cc $coverage_cflags -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  deps = gcc
+  description = CCCOV $out
+
+rule cxx_test_coverage
+  command = $cxx $coverage_test_cxxflags $in -o $out $coverage_test_ldflags
+  description = CXXLINKCOV $out
+
+rule run_tests
+  command = $in
+  description = TEST $in
+  pool = console
+
+rule run_coverage_test
+  command = LLVM_PROFILE_FILE=$profile $in
+  description = COVTEST $in
+  pool = console
+
+rule merge_coverage
+  command = xcrun llvm-profdata merge -sparse $in -o $out
+  description = COVMERGE $out
+
+rule report_coverage
+  command = xcrun llvm-cov report $run -instr-profile=$profile $
+    --sources noroi.c run.cc
+  description = COVERAGE
+  pool = console
+
+rule check_coverage
+  command = python3 coverage-check.py $run $profile noroi.c run.cc
+  description = COVCHECK
+  pool = console
+
+rule generate_compdb
+  command = ninja -t compdb cc cxx cxx_test > $out
+  description = COMPDB $out
+  generator = 1
+
+build $devdir: mkdir
+
+build $devdir/noroi.o: cc noroi.c || $devdir
+build $devdir/noroi-test.o: cc noroi.c || $devdir
+  cflags = $cflags -Dnoroi_conf_ip='"127.0.0.1"' -Dnoroi_conf_port=18080
+build $devdir/noroi-e2e.o: cc noroi.c || $devdir
+  cflags = $cflags -Dnoroi_conf_ip='"127.0.0.1"' -Dnoroi_conf_port=18081
+build $devdir/yyjson.o: cc yyjson.c || $devdir
+build $devdir/run.o: cxx run.cc || $devdir
+build $devdir/run: link $devdir/noroi.o $devdir/yyjson.o $devdir/run.o
+
+build $devdir/req-test: cxx_test req-test.cc $devdir/noroi.o || $devdir
+build $devdir/res-test: cxx_test res-test.cc $devdir/noroi.o || $devdir
+build $devdir/run-test: cxx_test run-test.cc $devdir/noroi-test.o $
+    $devdir/yyjson.o || $devdir
+  test_cxxflags = $test_cxxflags -DLOG_LEVEL='(-1)'
+build $devdir/e2e-test: cxx_test e2e-test.cc $devdir/noroi-e2e.o $
+    $devdir/yyjson.o || $devdir
+  test_cxxflags = $test_cxxflags -DLOG_LEVEL='(-1)'
+build test-req: run_tests $devdir/req-test
+build test-res: run_tests $devdir/res-test
+build test-run: run_tests $devdir/run-test
+build test-e2e: run_tests $devdir/e2e-test
+build test: phony test-req test-res test-run test-e2e
+
+build $coveragedir: mkdir
+
+build $coveragedir/noroi.o: cc_coverage noroi.c || $coveragedir
+build $coveragedir/noroi-test.o: cc_coverage noroi.c || $coveragedir
+  coverage_cflags = $coverage_cflags -Dnoroi_conf_ip='"127.0.0.1"' $
+    -Dnoroi_conf_port=18080
+build $coveragedir/noroi-e2e.o: cc_coverage noroi.c || $coveragedir
+  coverage_cflags = $coverage_cflags -Dnoroi_conf_ip='"127.0.0.1"' $
+    -Dnoroi_conf_port=18081
+build $coveragedir/yyjson.o: cc_coverage yyjson.c || $coveragedir
+build $coveragedir/req-test: cxx_test_coverage req-test.cc $
+    $coveragedir/noroi.o || $coveragedir
+build $coveragedir/res-test: cxx_test_coverage res-test.cc $
+    $coveragedir/noroi.o || $coveragedir
+build $coveragedir/run-test: cxx_test_coverage run-test.cc $
+    $coveragedir/noroi-test.o $coveragedir/yyjson.o || $coveragedir
+build $coveragedir/e2e-test: cxx_test_coverage e2e-test.cc $
+    $coveragedir/noroi-e2e.o $coveragedir/yyjson.o || $coveragedir
+  coverage_test_cxxflags = $coverage_test_cxxflags -DLOG_LEVEL='(-1)'
+
+build $coveragedir/req.profraw: run_coverage_test $coveragedir/req-test
+  profile = $coveragedir/req.profraw
+build $coveragedir/res.profraw: run_coverage_test $coveragedir/res-test
+  profile = $coveragedir/res.profraw
+build $coveragedir/run.profraw: run_coverage_test $coveragedir/run-test
+  profile = $coveragedir/run.profraw
+build $coveragedir/e2e.profraw: run_coverage_test $coveragedir/e2e-test
+  profile = $coveragedir/e2e.profraw
+build $coveragedir/coverage.profdata: merge_coverage $
+    $coveragedir/req.profraw $coveragedir/res.profraw $
+    $coveragedir/run.profraw $coveragedir/e2e.profraw
+build coverage-report: report_coverage $coveragedir/coverage.profdata | $
+    $coveragedir/req-test $coveragedir/res-test $coveragedir/run-test $
+    $coveragedir/e2e-test
+  run = $coveragedir/run-test
+  profile = $coveragedir/coverage.profdata
+build coverage-check: check_coverage $coveragedir/coverage.profdata | $
+    $coveragedir/run-test
+  run = $coveragedir/run-test
+  profile = $coveragedir/coverage.profdata
+build coverage: phony coverage-report coverage-check
+
+build $distdir: mkdir
+
+build $distdir/noroi.o: cc noroi.c || $distdir
+  cflags = $dist_cflags $mimalloc_cflags
+build $distdir/yyjson.o: cc yyjson.c || $distdir
+  cflags = $dist_cflags
+build $distdir/run.o: cxx run.cc || $distdir
+  cxxflags = $dist_cxxflags
+build $distdir/run: link $distdir/noroi.o $distdir/yyjson.o $distdir/run.o
+  ldflags = $dist_ldflags
+
+build compile_commands.json: generate_compdb build.ninja
+build compdb: phony compile_commands.json
+
+build dist: phony $distdir/run
+
+default $devdir/run
