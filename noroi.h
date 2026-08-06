@@ -183,8 +183,6 @@ void noroi_res_not_found(struct noroi_res_t* res,
 
 static uv_loop_t* loop;
 static uv_tcp_t server;
-static uv_async_t stop_async;
-static int stop_async_ready;
 
 typedef struct {
   uv_tcp_t tcp;
@@ -250,23 +248,8 @@ static void on_connection(uv_stream_t* server_handle, int status) {
   }
 }
 
-static void on_stop_async(uv_async_t* handle) {
-  if (!uv_is_closing((uv_handle_t*)&server))
-    uv_close((uv_handle_t*)&server, NULL);
-  if (!uv_is_closing((uv_handle_t*)handle))
-    uv_close((uv_handle_t*)handle, NULL);
-  stop_async_ready = 0;
-  uv_stop(loop);
-}
-
-void noroi_stop(void) {
-  if (stop_async_ready)
-    uv_async_send(&stop_async);
-}
-
 int noroi_run() {
   loop = uv_default_loop();
-  stop_async_ready = 0;
 
   struct sockaddr_in addr;
 
@@ -282,8 +265,6 @@ int noroi_run() {
     return EXIT_FAILURE;
   }
 
-  uv_async_init(loop, &stop_async, on_stop_async);
-  stop_async_ready = 1;
   return uv_run(loop, UV_RUN_DEFAULT);
 }
 
