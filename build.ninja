@@ -1,0 +1,73 @@
+libuv_root = ../libuv-1.52.1
+cc = clang
+cxx = clang++
+
+cflags = -std=c23 -Wall -Wextra -I$libuv_root/include
+ldflags = $libuv_root/build/libuv.a -lpthread -lm
+
+gtest_cflags = -I/opt/homebrew/include -DGTEST_HAS_PTHREAD=1
+gtest_ldlibs = -L/opt/homebrew/lib -lgtest_main -lgtest -pthread
+
+test_cxxflags = -std=c++23 -Wall -Wextra -I$libuv_root/include $gtest_cflags
+test_ldflags = $libuv_root/build/libuv.a -lpthread -lm $gtest_ldlibs
+
+builddir = build
+devdir = $builddir/dev
+distdir = $builddir/dist
+
+distflags = -O3 -DNDEBUG -flto
+dist_cflags = $cflags $distflags
+dist_ldflags = $ldflags -O3 -flto -Wl,-dead_strip
+
+rule mkdir
+  command = mkdir -p $out
+  description = MKDIR $out
+
+rule cc
+  command = $cc $cflags -MMD -MF $out.d -c $in -o $out
+  depfile = $out.d
+  deps = gcc
+  description = CC $out
+
+rule link
+  command = $cc $in -o $out $ldflags
+  description = LINK $out
+
+rule cxx_test
+  command = $cxx $test_cxxflags $in -o $out $test_ldflags
+  description = CXXLINK $out
+
+rule run_tests
+  command = $in
+  description = TEST $in
+  pool = console
+
+rule generate_compdb
+  command = ninja -t compdb cc > $out
+  description = COMPDB $out
+  generator = 1
+
+build $devdir: mkdir
+
+build $devdir/run.o: cc run.c || $devdir
+build $devdir/run: link $devdir/run.o
+
+build $devdir/req-test: cxx_test req-test.cc || $devdir
+build $devdir/run-test: cxx_test run-test.cc || $devdir
+build test-req: run_tests $devdir/req-test
+build test-run: run_tests $devdir/run-test
+build test: phony test-req test-run
+
+build $distdir: mkdir
+
+build $distdir/run.o: cc run.c || $distdir
+  cflags = $dist_cflags
+build $distdir/run: link $distdir/run.o
+  ldflags = $dist_ldflags
+
+build compile_commands.json: generate_compdb build.ninja
+build compdb: phony compile_commands.json
+
+build dist: phony $distdir/run
+
+default $devdir/run
