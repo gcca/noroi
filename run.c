@@ -1,27 +1,34 @@
 #include "lwlog.h"
 #include "noroi.h"
 
-struct Route {
-  const char* path;
-  void (*handler)(const struct noroi_req_t*, struct noroi_res_t*);
+struct Context {
+  const struct noroi_req_t* req;
+  struct noroi_res_t* res;
+  const char* const method;
+  const size_t method_size;
 };
 
-void handler_index(const struct noroi_req_t*, struct noroi_res_t* res) {
+struct Route {
+  const char* path;
+  void (*handler)(struct Context c);
+};
+
+void handler_index(struct Context c) {
   static const char url[] = "/welcome";
   static char xbuf[128];
-  noroi_res_redirect(res, xbuf, sizeof(xbuf), url, sizeof(url) - 1);
+  noroi_res_redirect(c.res, xbuf, sizeof(xbuf), url, sizeof(url) - 1);
 }
 
-void handler_welcome(const struct noroi_req_t*, struct noroi_res_t* res) {
+void handler_welcome(struct Context c) {
   static const char body[] = "Welcome\n";
   static char xbuf[512];
-  noroi_res_set_content_cstr(res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
+  noroi_res_set_content_cstr(c.res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
 }
 
-void handler_healthcheck(const struct noroi_req_t*, struct noroi_res_t* res) {
+void handler_healthcheck(struct Context c) {
   static const char body[] = "🍻\n";
   static char xbuf[512];
-  noroi_res_set_content_cstr(res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
+  noroi_res_set_content_cstr(c.res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
 }
 
 const struct Route routes[] = {
@@ -45,7 +52,7 @@ void route_map_dispatcher(const struct noroi_req_t* req,
 
   for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
     if (!strncmp(path, routes[i].path, path_size)) {
-      routes[i].handler(req, res);
+      routes[i].handler((struct Context){req, res, method, method_size});
       return;
     }
   }
