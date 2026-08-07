@@ -2,8 +2,8 @@
 #include "noroi.h"
 
 struct Context {
-  const struct noroi_req_t* req;
-  struct noroi_res_t* res;
+  const struct noroi_req_t* const req;
+  struct noroi_res_t* const res;
   const char* const method;
   const size_t method_size;
 };
@@ -20,6 +20,11 @@ void handler_index(struct Context c) {
 }
 
 void handler_welcome(struct Context c) {
+  if (strncmp(c.method, "GET", c.method_size) != 0) {
+    static char xbuf[512];
+    noroi_res_method_not_allowed(c.res, xbuf, sizeof(xbuf));
+    return;
+  }
   static const char body[] = "Welcome\n";
   static char xbuf[512];
   noroi_res_set_content_cstr(c.res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);

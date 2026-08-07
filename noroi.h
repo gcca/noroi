@@ -199,6 +199,22 @@ void noroi_res_redirect(struct noroi_res_t* res,
   res->buf = uv_buf_init(start, (size_t)(xbuf - start));
 }
 
+void noroi_res_method_not_allowed(struct noroi_res_t* res,
+                                  char* xbuf,
+                                  const size_t xbuf_size) {
+  static const char body[] = "Method Not Allowed\n";
+  const size_t len = sizeof(body) - 1;
+  char *start = xbuf, *end = xbuf + xbuf_size;
+  static const char status[] = "HTTP/1.0 405 Method Not Allowed\r\n";
+  xbuf = _noroi_append(xbuf, end, status, sizeof(status) - 1);
+  xbuf = _noroi_append_http_content_type(xbuf, end);
+  xbuf = _noroi_append_http_content_length(xbuf, end, len);
+  xbuf = _noroi_append_http_connection_close(xbuf, end);
+  xbuf = _noroi_append_http_crlf(xbuf, end);
+  xbuf = _noroi_append(xbuf, end, body, len);
+  res->buf = uv_buf_init(start, (size_t)(xbuf - start));
+}
+
 static uv_loop_t* loop;
 static uv_tcp_t server;
 
