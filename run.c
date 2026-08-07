@@ -15,24 +15,23 @@ struct Route {
 
 void handler_index(struct Context c) {
   static const char url[] = "/welcome";
-  static char xbuf[128];
+  char xbuf[128];
   noroi_res_redirect(c.res, xbuf, sizeof(xbuf), url, sizeof(url) - 1);
 }
 
 void handler_welcome(struct Context c) {
-  if (strncmp(c.method, "GET", c.method_size) != 0) {
-    static char xbuf[512];
+  char xbuf[512];
+  if (!strncmp(c.method, "GET", c.method_size)) {
     noroi_res_method_not_allowed(c.res, xbuf, sizeof(xbuf));
     return;
   }
   static const char body[] = "Welcome\n";
-  static char xbuf[512];
   noroi_res_set_content_cstr(c.res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
 }
 
 void handler_healthcheck(struct Context c) {
   static const char body[] = "🍻\n";
-  static char xbuf[512];
+  char xbuf[512];
   noroi_res_set_content_cstr(c.res, xbuf, sizeof(xbuf), body, sizeof(body) - 1);
 }
 
