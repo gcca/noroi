@@ -21,7 +21,7 @@ void handler_index(struct Context c) {
 
 void handler_welcome(struct Context c) {
   char xbuf[512];
-  if (!strncmp(c.method, "GET", c.method_size)) {
+  if (strncmp(c.method, "GET", c.method_size)) {
     noroi_res_method_not_allowed(c.res, xbuf, sizeof(xbuf));
     return;
   }
