@@ -6,6 +6,12 @@ struct Route {
   void (*handler)(const struct noroi_req_t*, struct noroi_res_t*);
 };
 
+void handler_index(const struct noroi_req_t*, struct noroi_res_t* res) {
+  static const char url[] = "/welcome";
+  static char xbuf[128];
+  noroi_res_redirect(res, xbuf, sizeof(xbuf), url, sizeof(url) - 1);
+}
+
 void handler_welcome(const struct noroi_req_t*, struct noroi_res_t* res) {
   static const char body[] = "Welcome\n";
   static char xbuf[512];
@@ -19,11 +25,13 @@ void handler_healthcheck(const struct noroi_req_t*, struct noroi_res_t* res) {
 }
 
 const struct Route routes[] = {
+    {"/", handler_index},
     {"/welcome", handler_welcome},
     {"/healthcheck", handler_healthcheck},
 };
 
-void route_dispatcher(const struct noroi_req_t* req, struct noroi_res_t* res) {
+void route_map_dispatcher(const struct noroi_req_t* req,
+                          struct noroi_res_t* res) {
   const char *method, *path, *query;
   size_t method_size, path_size, query_size;
 
@@ -48,7 +56,7 @@ void route_dispatcher(const struct noroi_req_t* req, struct noroi_res_t* res) {
 
 void noroi_handle(const struct noroi_req_t* req, struct noroi_res_t* res) {
   lwlog_info("Handling request");
-  route_dispatcher(req, res);
+  route_map_dispatcher(req, res);
   lwlog_info("Response sent");
 }
 

@@ -181,6 +181,24 @@ void noroi_res_not_found(struct noroi_res_t* res,
   res->buf = uv_buf_init(start, (size_t)(xbuf - start));
 }
 
+void noroi_res_redirect(struct noroi_res_t* res,
+                        char* xbuf,
+                        const size_t xbuf_size,
+                        const char* url,
+                        const size_t url_len) {
+  char *start = xbuf, *end = xbuf + xbuf_size;
+  static const char status[] = "HTTP/1.0 302 Found\r\n";
+  static const char location[] = "Location: ";
+  xbuf = _noroi_append(xbuf, end, status, sizeof(status) - 1);
+  xbuf = _noroi_append(xbuf, end, location, sizeof(location) - 1);
+  xbuf = _noroi_append(xbuf, end, url, url_len);
+  xbuf = _noroi_append_http_crlf(xbuf, end);
+  xbuf = _noroi_append_http_content_length(xbuf, end, 0);
+  xbuf = _noroi_append_http_connection_close(xbuf, end);
+  xbuf = _noroi_append_http_crlf(xbuf, end);
+  res->buf = uv_buf_init(start, (size_t)(xbuf - start));
+}
+
 static uv_loop_t* loop;
 static uv_tcp_t server;
 

@@ -53,10 +53,12 @@ build $devdir/run.o: cc run.c || $devdir
 build $devdir/run: link $devdir/run.o
 
 build $devdir/req-test: cxx_test req-test.cc || $devdir
+build $devdir/res-test: cxx_test res-test.cc || $devdir
 build $devdir/run-test: cxx_test run-test.cc || $devdir
 build test-req: run_tests $devdir/req-test
+build test-res: run_tests $devdir/res-test
 build test-run: run_tests $devdir/run-test
-build test: phony test-req test-run
+build test: phony test-req test-res test-run
 
 build $distdir: mkdir
 
