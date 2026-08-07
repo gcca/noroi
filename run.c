@@ -38,10 +38,10 @@ void route_map_dispatcher(const struct noroi_req_t* req,
   noroi_req_parse_url(req, &method, &method_size, &path, &path_size, &query,
                       &query_size);
 
-  lwlog_debug("Request sizes: method_size=%zu, path_size=%zu, query=%zu",
-              method_size, path_size, query_size);
-  lwlog_debug("Request method: %.*s, path: %.*s, query: %.*s", (int)method_size,
-              method, (int)path_size, path, (int)query_size, query);
+  lwlog_debug("method_size=%zu, path_size=%zu, query=%zu", method_size,
+              path_size, query_size);
+  lwlog_debug("method: %.*s, path: %.*s, query: %.*s", (int)method_size, method,
+              (int)path_size, path, (int)query_size, query);
 
   for (size_t i = 0; i < sizeof(routes) / sizeof(routes[0]); ++i) {
     if (!strncmp(path, routes[i].path, path_size)) {
